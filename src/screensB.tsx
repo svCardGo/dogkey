@@ -4,6 +4,7 @@ import { useDogKeyStore } from './store/useDogKeyStore';
 import { Toggle } from './components/Toggle';
 import Icon from './lib/icons';
 import { takePhoto, pickFile, scanDocument } from './lib/media';
+import { GlassDialog } from './components/GlassDialog';
 import { BottomNav, ItemRow } from './screensA';
 
 export function HomeScreen() {
@@ -65,6 +66,7 @@ export function FolderScreen() {
   const navigate = useNavigate();
   const id = useLocation().pathname.split('/folder/')[1] || null;
   const { getItem, getChildren, setShareEnabled, setCurrentFolder, addItem } = useDogKeyStore();
+  const [folderDialog, setFolderDialog] = useState(false);
   const folder = id ? getItem(id) : null;
   const children = getChildren(id);
   return (
@@ -87,10 +89,18 @@ export function FolderScreen() {
           }} trailing={<Toggle on={it.shareEnabled} onChange={(v) => setShareEnabled(it.id, v)} />} />
         ))
       )}
-      <button className="glass-button" style={{ width: '100%', marginTop: 20 }} onClick={() => {
-        const name = window.prompt('Folder name');
-        if (name?.trim()) addItem({ type: 'folder', title: name.trim(), parentId: id });
-      }}>+ Create Folder</button>
+      <button className="glass-button" style={{ width: '100%', marginTop: 20 }} onClick={() => setFolderDialog(true)}>+ Create Folder</button>
+      <GlassDialog
+        open={folderDialog}
+        title="Create Folder"
+        placeholder="Folder name"
+        confirmLabel="Create"
+        onConfirm={(name) => {
+          if (name) void addItem({ type: 'folder', title: name, parentId: id });
+          setFolderDialog(false);
+        }}
+        onCancel={() => setFolderDialog(false)}
+      />
       <BottomNav />
     </div>
   );
@@ -110,7 +120,7 @@ export function AddNewScreen() {
       const isVideo = media.mimeType.startsWith('video/');
       const isPdf = media.mimeType === 'application/pdf' || media.fileName.toLowerCase().endsWith('.pdf');
       const type = isImage ? 'image' as const : isVideo ? 'video' as const : isPdf ? 'pdf' as const : 'file' as const;
-      addItem({
+      void addItem({
         type,
         title: media.fileName,
         mimeType: media.mimeType,
@@ -127,7 +137,7 @@ export function AddNewScreen() {
   const options = [
     { label: 'Upload File', desc: 'Photos, Videos, PDF, Docs…', action: () => handleMedia('file'), emoji: '📄' },
     { label: 'Take Photo', desc: 'Open Camera', action: () => handleMedia('photo'), emoji: '📷' },
-    { label: 'Scan Document', desc: 'Capture with camera', action: () => handleMedia('scan'), emoji: '📠' },
+    { label: 'Scan Document', desc: 'Capture → crop → enhance', action: () => handleMedia('scan'), emoji: '📠' },
     { label: 'Add Contact', desc: 'Name, Mobile, Email…', path: '/add-contact', emoji: '👤' },
     { label: 'Add Link', desc: 'Website, YouTube, Maps…', path: '/add-link', emoji: '🔗' },
     { label: 'Add Note', desc: 'Text / Important Info', path: '/add-note', emoji: '📝' },
@@ -175,7 +185,7 @@ export function AddContactScreen() {
         </div>
         <button className="glass-button" style={{ width: '100%' }} onClick={() => {
           if (!form.name.trim()) return;
-          addItem({ type: 'contact', title: form.name, mobile: form.mobile, whatsapp: form.whatsapp, email: form.email, address: form.address, website: form.website, notes: form.notes, shareEnabled: form.share, parentId: 'folder-contacts' });
+          void addItem({ type: 'contact', title: form.name, mobile: form.mobile, whatsapp: form.whatsapp, email: form.email, address: form.address, website: form.website, notes: form.notes, shareEnabled: form.share, parentId: 'folder-contacts' });
           navigate('/home');
         }}>Save Contact</button>
       </div>
@@ -204,7 +214,7 @@ export function AddLinkScreen() {
         </div>
         <button className="glass-button" style={{ width: '100%' }} onClick={() => {
           if (!form.title || !form.url) return;
-          addItem({ type: 'link', title: form.title, url: form.url, description: form.description, shareEnabled: form.share, parentId: 'folder-links' });
+          void addItem({ type: 'link', title: form.title, url: form.url, description: form.description, shareEnabled: form.share, parentId: 'folder-links' });
           navigate('/home');
         }}>Save Link</button>
       </div>
@@ -231,7 +241,7 @@ export function AddNoteScreen() {
       </div>
       <button className="glass-button" style={{ width: '100%' }} onClick={() => {
         if (!content.trim()) return;
-        addItem({ type: 'note', title: content.slice(0, 40) || 'Note', content, shareEnabled: share, parentId: 'folder-notes' });
+        void addItem({ type: 'note', title: content.slice(0, 40) || 'Note', content, shareEnabled: share, parentId: 'folder-notes' });
         navigate('/home');
       }}>Save Note</button>
     </div>
