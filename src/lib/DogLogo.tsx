@@ -1,9 +1,14 @@
+/**
+ * DogKey™ brand mark — DOG ONLY.
+ * No key · no key shape · no key stroke · no key symbolism.
+ * Clean dog head: floppy ears, soft muzzle, loyal face.
+ */
 import React from 'react';
 
 interface DogLogoProps {
   size?: number | string;
   className?: string;
-  variant?: 'mark' | 'wordmark';
+  variant?: 'mark' | 'profile';
   color?: string;
 }
 
@@ -14,6 +19,31 @@ export function DogLogo({
   color = 'currentColor',
 }: DogLogoProps) {
   const s = typeof size === 'number' ? size : undefined;
+
+  if (variant === 'profile') {
+    return (
+      <svg
+        width={s}
+        height={s}
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={className}
+        style={{ width: size, height: size, color }}
+        aria-label="DogKey"
+        role="img"
+      >
+        {/* Single solid profile path — no internal holes */}
+        <path
+          fill={color}
+          fillRule="evenodd"
+          d="M8 47c2.2-5.5 7-11 12.5-14 1.8-4.2 5-8 9-10 3.2-1.6 6.8-2 10-1 3.5 1.1 6.4 3.6 8 6.8 1.2 2.4 1.5 5.1.9 7.7 3.5 1.8 6.2 4.8 7.8 8.5 1.8 4.2 1.8 9-.2 13.2-1.4 3-3.8 5.5-6.8 7-2.5 1.3-5.3 1.9-8.1 1.9H28.5c-1.8 0-3.3-1.3-3.5-3.1-4.2-1.5-7.8-4.4-10-8.2C12 52.5 9.2 49.5 8 47z
+             M20 22c-2.8 0-5.2 2.2-5.8 5.2-1.2 5.5.2 12 3.5 16.5.8 1.1 1.8 2 2.9 2.7.6-8.2.8-16.5-.6-24.4z"
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg
       width={s}
@@ -24,36 +54,57 @@ export function DogLogo({
       className={className}
       style={{ width: size, height: size, color }}
       aria-label="DogKey"
+      role="img"
     >
-      <circle cx="32" cy="32" r="30" fill="rgba(196,165,116,0.12)" stroke="rgba(196,165,116,0.35)" strokeWidth="1.5" />
-      <path
-        d="M32 14c-6.2 0-11.2 3.4-13.4 8.4-1.1-0.6-2.4-1-3.8-1-3.6 0-6.5 2.7-6.5 6.1 0 2.4 1.4 4.5 3.5 5.5v0.3c0 9.2 7.2 16.6 16.2 16.6h8c9 0 16.2-7.4 16.2-16.6v-0.3c2.1-1 3.5-3.1 3.5-5.5 0-3.4-2.9-6.1-6.5-6.1-1.4 0-2.7 0.4-3.8 1C43.2 17.4 38.2 14 32 14z"
-        fill={color}
-        opacity="0.92"
+      <circle
+        cx="32"
+        cy="32"
+        r="30"
+        fill="rgba(212,184,150,0.10)"
+        stroke="rgba(212,184,150,0.28)"
+        strokeWidth="1.25"
       />
-      <path d="M18.5 24.5c-1.8-3.2-1.2-6.8 1.4-8.4 1.8 2.4 3.2 5.4 3.6 8.6-1.7 0.2-3.4-0.1-5-0.2z" fill={color} opacity="0.75" />
-      <path d="M45.5 24.5c1.8-3.2 1.2-6.8-1.4-8.4-1.8 2.4-3.2 5.4-3.6 8.6 1.7 0.2 3.4-0.1 5-0.2z" fill={color} opacity="0.75" />
-      <circle cx="26" cy="32" r="2.2" fill="var(--bg-ivory, #faf6f0)" />
-      <circle cx="38" cy="32" r="2.2" fill="var(--bg-ivory, #faf6f0)" />
-      <circle cx="26.4" cy="32.3" r="1" fill={color} />
-      <circle cx="38.4" cy="32.3" r="1" fill={color} />
-      <ellipse cx="32" cy="37.5" rx="2.4" ry="1.8" fill="var(--bg-ivory, #faf6f0)" opacity="0.9" />
-      <path d="M28 40.5c1.2 1.4 2.6 2.1 4 2.1s2.8-0.7 4-2.1" stroke="var(--bg-ivory, #faf6f0)" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.7" />
+      {/* Unified dog silhouette: ears + head + muzzle */}
+      <ellipse cx="14" cy="30" rx="9" ry="14" transform="rotate(-18 14 30)" fill={color} />
+      <ellipse cx="50" cy="30" rx="9" ry="14" transform="rotate(18 50 30)" fill={color} />
+      <ellipse cx="32" cy="30" rx="17" ry="16" fill={color} />
+      <ellipse cx="32" cy="38" rx="10" ry="8" fill={color} />
+      {/* Eyes */}
+      <circle cx="25" cy="28" r="2.8" fill="rgba(250,246,240,0.95)" />
+      <circle cx="39" cy="28" r="2.8" fill="rgba(250,246,240,0.95)" />
+      <circle cx="25.5" cy="28.4" r="1.2" fill={color} />
+      <circle cx="39.5" cy="28.4" r="1.2" fill={color} />
+      {/* Nose */}
+      <ellipse cx="32" cy="37.5" rx="3.4" ry="2.6" fill="rgba(250,246,240,0.92)" />
+      {/* Smile */}
+      <path
+        d="M26.5 42c1.8 2 3.6 2.9 5.5 2.9s3.7-.9 5.5-2.9"
+        stroke="rgba(250,246,240,0.82)"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+        fill="none"
+      />
     </svg>
   );
 }
 
-export function DogLogoWordmark({ size = 28 }: { size?: number }) {
+export function DogLogoWordmark({
+  size = 28,
+  color = 'var(--accent-champagne)',
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <DogLogo size={size} color="var(--accent-deep)" />
+      <DogLogo size={size} color={color} />
       <span
         style={{
           fontFamily: 'var(--font-serif)',
           fontSize: size * 0.72,
           fontWeight: 600,
           letterSpacing: '0.04em',
-          color: 'var(--accent-deep)',
+          color,
         }}
       >
         DogKey
