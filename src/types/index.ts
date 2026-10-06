@@ -4,11 +4,16 @@ export interface DogKeyUser {
   id: string;
   displayName: string;
   profilePhoto: string | null;
+  /** PBKDF2-SHA-256 hash — never the raw PIN */
   loginPinHash: string | null;
+  /** Per-user salt for PIN derivation */
+  loginPinSalt: string | null;
   createdAt: string;
   updatedAt: string;
   googleConnected: boolean;
   googleEmail?: string;
+  googleAccessToken?: string;
+  googleTokenExpiry?: string;
 }
 
 export interface DogKeyItem {
@@ -42,12 +47,15 @@ export interface ShareSession {
   createdAt: string;
   expiresAt: string;
   pinHash: string;
+  pinSalt: string;
   enabled: boolean;
   masterShare: boolean;
   selectedItemIds: string[];
   qrPayload: string;
   revokedAt?: string;
   sharePinDisplay?: string;
+  attemptCount?: number;
+  lockedUntil?: string;
 }
 
 export interface AppSettings {
@@ -77,4 +85,5 @@ export type Screen =
   | 'validity'
   | 'about'
   | 'file-options'
-  | 'search';
+  | 'search'
+  | 'profile';

@@ -24,7 +24,7 @@ export function PinPad({ value, onChange, maxLength = 4, onComplete }: PinPadPro
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
   return (
-    <div>
+    <div className="pin-pad-wrap">
       <div className="pin-dots">
         {Array.from({ length: maxLength }).map((_, i) => (
           <div key={i} className={`pin-dot ${i < value.length ? 'filled' : ''}`} />
@@ -33,7 +33,7 @@ export function PinPad({ value, onChange, maxLength = 4, onComplete }: PinPadPro
       <div className="pin-pad">
         {keys.map((k, i) =>
           k === '' ? (
-            <div key={i} />
+            <div key={i} className="pin-key empty" />
           ) : (
             <button
               key={i}
