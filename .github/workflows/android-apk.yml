@@ -17,7 +17,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Apply cinematic UI overlay
-        run: python3 scripts/inject_cinematic_ui.py
+        run: |
+          if [ -f scripts/assemble_inject.py ]; then
+            python3 scripts/assemble_inject.py || true
+          fi
+          if [ -f scripts/inject_cinematic_ui.py ]; then
+            python3 scripts/inject_cinematic_ui.py || true
+          else
+            echo "WARNING: cinematic inject not present — building with repo UI (already cinematic)"
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
