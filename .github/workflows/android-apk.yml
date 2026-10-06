@@ -16,42 +16,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Apply clean UI patches
+      - name: Strip dog emoji only (safe)
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
-          # Prefer local inject scripts if present
-          for name in ('scripts/inject_B.py', 'scripts/inject_C.py', 'scripts/inject_clean_screens.py'):
-              p = Path(name)
-              if p.exists():
-                  import subprocess, sys
-                  try:
-                      subprocess.check_call([sys.executable, str(p)])
-                  except Exception as e:
-                      print('inject skip', name, e)
-          # Strip any remaining dog imagery / emoji from screens
           for rel in ('src/screensA.tsx', 'src/screensB.tsx', 'src/screensC.tsx'):
               p = Path(rel)
               if not p.exists():
                   continue
               t = p.read_text()
-              t = t.replace('\U0001f415', '')  # dog face
-              t = t.replace('\U0001f436', '')  # dog face alt
-              t = t.replace('🐕', '')
-              t = t.replace("DogLogo", '/* DogLogo removed */')
-              # Remove hero-dog blocks (non-greedy)
-              t = re.sub(r'<div className="hero-dog-wrap[^>]*>[\s\S]*?</div>\s*', '', t, count=3)
-              t = re.sub(r'<div className="dog-portrait-lg">[^<]*</div>', '', t)
-              t = re.sub(r"<span style=\{\{ fontSize: 18 \}\}>[^<]*</span>", "<span style={{ fontSize: 16, fontWeight: 600, color: 'var(--green)' }}>U</span>", t, count=1)
-              p.write_text(t)
-              print('patched', rel)
-          # Ensure index.css is the clean system (not empty cinematic imports only)
-          idx = Path('src/index.css')
-          if idx.exists() and 'soft green' not in idx.read_text().lower() and '--green:#2d9f6f' not in idx.read_text():
-              print('WARNING: index.css may not be clean system')
-          else:
-              print('index.css ok')
+              t2 = t.replace('🐕', '').replace('🐶', '')
+              if t2 != t:
+                  p.write_text(t2)
+                  print('emoji stripped', rel)
+              else:
+                  print('ok', rel)
           PY
 
       - name: Setup Node.js
