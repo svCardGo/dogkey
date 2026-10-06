@@ -60,25 +60,25 @@ jobs:
 
       - name: Android camera permissions
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          if not p.exists():
-              print("no manifest yet")
-              raise SystemExit(0)
-          t = p.read_text()
-          if "CAMERA" in t:
-              print("permissions already present")
-          else:
-              perms = """    <uses-permission android:name="android.permission.CAMERA" />
-              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-              <uses-feature android:name="android.hardware.camera" android:required="false" />
-          """
-              t = t.replace("<application", perms + "\n    <application", 1)
-              p.write_text(t)
-              print("permissions injected")
-          PY
+          python3 - <<'PY'
+from pathlib import Path
+p = Path("android/app/src/main/AndroidManifest.xml")
+if not p.exists():
+    print("no manifest yet")
+    raise SystemExit(0)
+t = p.read_text()
+if "CAMERA" in t:
+    print("permissions already present")
+else:
+    perms = '''    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+'''
+    t = t.replace("<application", perms + "\n    <application", 1)
+    p.write_text(t)
+    print("permissions injected")
+PY
 
       - name: Report debug keystore SHA-1 (for Google OAuth)
         run: |
@@ -103,20 +103,20 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Collect APK → DogKey-debug-SUPREME.apk
+      - name: Collect APK → DogKey-debug-SUPREME-v2.apk
         run: |
           set -e
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
           echo "Located APK: $APK_PATH"
           test -f "$APK_PATH"
           mkdir -p artifacts
-          cp "$APK_PATH" artifacts/DogKey-debug-SUPREME.apk
+          cp "$APK_PATH" artifacts/DogKey-debug-SUPREME-v2.apk
           ls -lh artifacts/
 
-      - name: Upload DogKey-debug-SUPREME.apk
+      - name: Upload DogKey-debug-SUPREME-v2.apk
         uses: actions/upload-artifact@v4
         with:
-          name: DogKey-debug-SUPREME.apk
-          path: artifacts/DogKey-debug-SUPREME.apk
+          name: DogKey-debug-SUPREME-v2.apk
+          path: artifacts/DogKey-debug-SUPREME-v2.apk
           retention-days: 30
           if-no-files-found: error
