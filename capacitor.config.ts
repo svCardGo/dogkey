@@ -9,14 +9,13 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
-    backgroundColor: '#0c0907',
-    // Release security: WebView remote debugging MUST be off
+    backgroundColor: '#ffffff',
     webContentsDebuggingEnabled: false,
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: '#0c0907',
+      launchShowDuration: 1800,
+      backgroundColor: '#ffffff',
       showSpinner: false,
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
