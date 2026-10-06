@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
-parts = sorted(Path("scripts/inject_parts").glob("part_*.txt"))
-text = "".join(p.read_text() for p in parts)
-Path("scripts/inject_cinematic_ui.py").write_text(text)
-print("assembled inject", len(text))
+# No-op: cinematic UI is committed in-tree
+Path('scripts/inject_cinematic_ui.py').write_text(
+    '#!/usr/bin/env python3\nprint("inject skipped — UI already in source")\n'
+)
+print('assembled inject noop')
