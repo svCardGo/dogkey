@@ -1,35 +1,26 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DogKeyUser, DogKeyItem, ShareSession, AppSettings, ItemType } from '../types';
+import { generateSalt, derivePinHash, verifyPin, buildShareQrPayload } from '../lib/crypto';
 
 function uid() {
   return crypto.randomUUID();
 }
 
-function hashPin(pin: string): string {
-  let h = 0;
-  for (let i = 0; i < pin.length; i++) {
-    h = (Math.imul(31, h) + pin.charCodeAt(i)) | 0;
-  }
-  return `dk_${h.toString(16)}_${pin.length}`;
+function seedFolders(): DogKeyItem[] {
+  const now = new Date().toISOString();
+  const roots = ['Documents', 'Photos', 'Videos', 'Contacts', 'Links', 'Notes'];
+  return roots.map((title, i) => ({
+    id: `folder-${title.toLowerCase()}`,
+    parentId: null,
+    type: 'folder' as const,
+    title,
+    shareEnabled: false,
+    sortOrder: i,
+    createdAt: now,
+    updatedAt: now,
+  }));
 }
-
-const DEMO_ITEMS: DogKeyItem[] = [
-  { id: 'folder-docs', parentId: null, type: 'folder', title: 'Documents', shareEnabled: false, sortOrder: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-photos', parentId: null, type: 'folder', title: 'Photos', shareEnabled: false, sortOrder: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-videos', parentId: null, type: 'folder', title: 'Videos', shareEnabled: false, sortOrder: 2, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-contacts', parentId: null, type: 'folder', title: 'Contacts', shareEnabled: false, sortOrder: 3, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-links', parentId: null, type: 'folder', title: 'Links', shareEnabled: false, sortOrder: 4, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-notes', parentId: null, type: 'folder', title: 'Notes', shareEnabled: false, sortOrder: 5, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-personal', parentId: 'folder-docs', type: 'folder', title: 'Personal', shareEnabled: false, sortOrder: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-education', parentId: 'folder-docs', type: 'folder', title: 'Education', shareEnabled: false, sortOrder: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-business', parentId: 'folder-docs', type: 'folder', title: 'Business', shareEnabled: true, sortOrder: 2, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'folder-certs', parentId: 'folder-docs', type: 'folder', title: 'Certificates', shareEnabled: false, sortOrder: 3, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'file-cert', parentId: 'folder-certs', type: 'pdf', title: 'Certificate.pdf', mimeType: 'application/pdf', size: 2400000, shareEnabled: true, sortOrder: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'contact-1', parentId: 'folder-contacts', type: 'contact', title: 'Aarav Sharma', mobile: '+91 98765 43210', whatsapp: '+91 98765 43210', email: 'aarav@example.com', shareEnabled: false, sortOrder: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'link-1', parentId: 'folder-links', type: 'link', title: 'My Portfolio', url: 'https://example.com', description: 'Personal website', shareEnabled: true, sortOrder: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'note-1', parentId: 'folder-notes', type: 'note', title: 'Important Info', content: 'Keep everything. Share only what you choose.', shareEnabled: false, sortOrder: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-];
 
 interface DogKeyState {
   hasOnboarded: boolean;
@@ -43,9 +34,9 @@ interface DogKeyState {
   searchQuery: string;
   setOnboarded: (v: boolean) => void;
   setUnlocked: (v: boolean) => void;
-  createUser: (name: string, pin: string) => void;
-  verifyLoginPin: (pin: string) => boolean;
-  changeLoginPin: (oldPin: string, newPin: string) => boolean;
+  createUser: (name: string, pin: string) => Promise<void>;
+  verifyLoginPin: (pin: string) => Promise<boolean>;
+  changeLoginPin: (oldPin: string, newPin: string) => Promise<boolean>;
   connectGoogle: () => void;
   disconnectGoogle: () => void;
   addItem: (item: Partial<DogKeyItem> & { type: ItemType; title: string }) => string;
@@ -59,9 +50,9 @@ interface DogKeyState {
   getSharedItems: () => DogKeyItem[];
   searchItems: (q: string) => DogKeyItem[];
   setMasterShare: (on: boolean) => void;
-  createShareSession: (pin: string, validityMinutes: number, selectedIds?: string[]) => void;
+  createShareSession: (pin: string, validityMinutes: number, selectedIds?: string[]) => Promise<void>;
   stopSharing: () => void;
-  verifySharePin: (pin: string) => boolean;
+  verifySharePin: (pin: string) => Promise<boolean>;
   isShareActive: () => boolean;
   updateSettings: (s: Partial<AppSettings>) => void;
   setSearchQuery: (q: string) => void;
@@ -74,7 +65,7 @@ export const useDogKeyStore = create<DogKeyState>()(
       hasOnboarded: false,
       isUnlocked: false,
       user: null,
-      items: DEMO_ITEMS,
+      items: seedFolders(),
       currentFolderId: null,
       shareSession: null,
       masterShare: false,
@@ -82,48 +73,86 @@ export const useDogKeyStore = create<DogKeyState>()(
       searchQuery: '',
       setOnboarded: (v) => set({ hasOnboarded: v }),
       setUnlocked: (v) => set({ isUnlocked: v }),
-      createUser: (name, pin) => {
-        const user: DogKeyUser = {
-          id: uid(), displayName: name || 'Radhakishan', profilePhoto: null,
-          loginPinHash: hashPin(pin), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), googleConnected: false,
-        };
-        set({ user, hasOnboarded: true, isUnlocked: true });
+      createUser: async (name, pin) => {
+        const salt = await generateSalt();
+        const loginPinHash = await derivePinHash(pin, salt);
+        set({
+          user: {
+            id: uid(),
+            displayName: name || 'User',
+            profilePhoto: null,
+            loginPinHash,
+            loginPinSalt: salt,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            googleConnected: false,
+          },
+          hasOnboarded: true,
+          isUnlocked: true,
+        });
       },
-      verifyLoginPin: (pin) => {
+      verifyLoginPin: async (pin) => {
         const { user } = get();
-        if (!user?.loginPinHash) return false;
-        return user.loginPinHash === hashPin(pin);
+        if (!user?.loginPinHash || !user.loginPinSalt) return false;
+        return verifyPin(pin, user.loginPinSalt, user.loginPinHash);
       },
-      changeLoginPin: (oldPin, newPin) => {
-        const { user, verifyLoginPin } = get();
-        if (!user || !verifyLoginPin(oldPin)) return false;
-        set({ user: { ...user, loginPinHash: hashPin(newPin), updatedAt: new Date().toISOString() } });
+      changeLoginPin: async (oldPin, newPin) => {
+        const { user } = get();
+        if (!user?.loginPinHash || !user.loginPinSalt) return false;
+        if (!(await verifyPin(oldPin, user.loginPinSalt, user.loginPinHash))) return false;
+        const salt = await generateSalt();
+        const loginPinHash = await derivePinHash(newPin, salt);
+        set({ user: { ...user, loginPinHash, loginPinSalt: salt, updatedAt: new Date().toISOString() } });
         return true;
       },
       connectGoogle: () => {
-        const { user } = get();
-        if (!user) return;
-        set({ user: { ...user, googleConnected: true, googleEmail: 'user@gmail.com', updatedAt: new Date().toISOString() } });
+        console.warn('[DogKey] Google Drive requires valid Android OAuth client (com.dogkey.app + SHA-1).');
       },
       disconnectGoogle: () => {
         const { user } = get();
         if (!user) return;
-        set({ user: { ...user, googleConnected: false, googleEmail: undefined, updatedAt: new Date().toISOString() } });
+        set({
+          user: {
+            ...user,
+            googleConnected: false,
+            googleEmail: undefined,
+            googleAccessToken: undefined,
+            googleTokenExpiry: undefined,
+            updatedAt: new Date().toISOString(),
+          },
+        });
       },
       addItem: (partial) => {
         const id = uid();
         const item: DogKeyItem = {
-          id, parentId: partial.parentId ?? get().currentFolderId, type: partial.type, title: partial.title,
-          description: partial.description, mimeType: partial.mimeType, content: partial.content, url: partial.url,
-          mobile: partial.mobile, whatsapp: partial.whatsapp, email: partial.email, address: partial.address,
-          website: partial.website, notes: partial.notes, shareEnabled: partial.shareEnabled ?? false,
-          sortOrder: Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), size: partial.size,
+          id,
+          parentId: partial.parentId ?? get().currentFolderId,
+          type: partial.type,
+          title: partial.title,
+          description: partial.description,
+          mimeType: partial.mimeType,
+          content: partial.content,
+          thumbnail: partial.thumbnail,
+          url: partial.url,
+          mobile: partial.mobile,
+          whatsapp: partial.whatsapp,
+          email: partial.email,
+          address: partial.address,
+          website: partial.website,
+          notes: partial.notes,
+          shareEnabled: partial.shareEnabled ?? false,
+          sortOrder: Date.now(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          size: partial.size,
         };
         set((s) => ({ items: [...s.items, item] }));
         return id;
       },
       updateItem: (id, updates) => {
-        set((s) => ({ items: s.items.map((it) => it.id === id ? { ...it, ...updates, updatedAt: new Date().toISOString() } : it) }));
+        set((s) => ({
+          items: s.items.map((it) => (it.id === id ? { ...it, ...updates, updatedAt: new Date().toISOString() } : it)),
+        }));
       },
       deleteItem: (id) => {
         const toDelete = new Set<string>([id]);
@@ -132,64 +161,144 @@ export const useDogKeyStore = create<DogKeyState>()(
         while (changed) {
           changed = false;
           for (const it of items) {
-            if (it.parentId && toDelete.has(it.parentId) && !toDelete.has(it.id)) { toDelete.add(it.id); changed = true; }
+            if (it.parentId && toDelete.has(it.parentId) && !toDelete.has(it.id)) {
+              toDelete.add(it.id);
+              changed = true;
+            }
           }
         }
         set((s) => ({ items: s.items.filter((it) => !toDelete.has(it.id)) }));
       },
       moveItem: (id, newParentId) => {
-        set((s) => ({ items: s.items.map((it) => it.id === id ? { ...it, parentId: newParentId, updatedAt: new Date().toISOString() } : it) }));
+        set((s) => ({
+          items: s.items.map((it) =>
+            it.id === id ? { ...it, parentId: newParentId, updatedAt: new Date().toISOString() } : it
+          ),
+        }));
       },
       setShareEnabled: (id, enabled) => {
-        set((s) => ({ items: s.items.map((it) => it.id === id ? { ...it, shareEnabled: enabled, updatedAt: new Date().toISOString() } : it) }));
+        set((s) => ({
+          items: s.items.map((it) =>
+            it.id === id ? { ...it, shareEnabled: enabled, updatedAt: new Date().toISOString() } : it
+          ),
+        }));
       },
       setCurrentFolder: (id) => set({ currentFolderId: id }),
-      getChildren: (parentId) => get().items.filter((it) => it.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder),
+      getChildren: (parentId) =>
+        get()
+          .items.filter((it) => it.parentId === parentId)
+          .sort((a, b) => a.sortOrder - b.sortOrder),
       getItem: (id) => get().items.find((it) => it.id === id),
       getSharedItems: () => {
         const { items, masterShare, shareSession } = get();
-        if (!shareSession?.enabled && !masterShare) return [];
-        if (masterShare) return items.filter((it) => it.shareEnabled && it.type !== 'folder');
-        const ids = new Set(shareSession?.selectedItemIds ?? []);
-        return items.filter((it) => ids.has(it.id) || (it.shareEnabled && it.type !== 'folder'));
+        if (!get().isShareActive() && !masterShare) return [];
+        const selected = new Set(shareSession?.selectedItemIds ?? []);
+        const sharedFolderIds = new Set(
+          items.filter((it) => it.type === 'folder' && it.shareEnabled).map((it) => it.id)
+        );
+        const underSharedFolder = (it: DogKeyItem): boolean => {
+          let pid = it.parentId;
+          while (pid) {
+            if (sharedFolderIds.has(pid)) return true;
+            const parent = items.find((x) => x.id === pid);
+            pid = parent?.parentId ?? null;
+          }
+          return false;
+        };
+        return items.filter((it) => {
+          if (it.type === 'folder') return false;
+          if (masterShare && (it.shareEnabled || underSharedFolder(it))) return true;
+          if (selected.has(it.id) || it.shareEnabled || underSharedFolder(it)) return true;
+          return false;
+        });
       },
       searchItems: (q) => {
         const lower = q.toLowerCase().trim();
         if (!lower) return [];
-        return get().items.filter((it) =>
-          it.title.toLowerCase().includes(lower) || it.description?.toLowerCase().includes(lower) ||
-          it.content?.toLowerCase().includes(lower) || it.url?.toLowerCase().includes(lower) ||
-          it.email?.toLowerCase().includes(lower) || it.mobile?.includes(lower)
+        return get().items.filter(
+          (it) =>
+            it.title.toLowerCase().includes(lower) ||
+            it.description?.toLowerCase().includes(lower) ||
+            it.content?.toLowerCase().includes(lower) ||
+            it.url?.toLowerCase().includes(lower) ||
+            it.email?.toLowerCase().includes(lower) ||
+            it.mobile?.includes(lower)
         );
       },
       setMasterShare: (on) => set({ masterShare: on }),
-      createShareSession: (pin, validityMinutes, selectedIds) => {
+      createShareSession: async (pin, validityMinutes, selectedIds) => {
         const { user, items, masterShare } = get();
         if (!user) return;
         const now = new Date();
         const expires = new Date(now.getTime() + validityMinutes * 60 * 1000);
         const ids = selectedIds ?? items.filter((it) => it.shareEnabled).map((it) => it.id);
-        const session: ShareSession = {
-          id: uid(), ownerId: user.id, createdAt: now.toISOString(), expiresAt: expires.toISOString(),
-          pinHash: hashPin(pin), enabled: true, masterShare, selectedItemIds: ids,
-          qrPayload: JSON.stringify({ v: 1, sid: uid().slice(0, 8), oid: user.id.slice(0, 8), n: user.displayName }),
-          sharePinDisplay: pin,
-        };
-        set({ shareSession: session });
+        const sessionId = uid();
+        const pinSalt = await generateSalt();
+        const pinHash = await derivePinHash(pin, pinSalt);
+        const qrPayload = buildShareQrPayload({
+          id: sessionId,
+          ownerId: user.id,
+          expiresAt: expires.toISOString(),
+          ownerName: user.displayName,
+        });
+        set({
+          shareSession: {
+            id: sessionId,
+            ownerId: user.id,
+            createdAt: now.toISOString(),
+            expiresAt: expires.toISOString(),
+            pinHash,
+            pinSalt,
+            enabled: true,
+            masterShare,
+            selectedItemIds: ids,
+            qrPayload,
+            sharePinDisplay: pin,
+            attemptCount: 0,
+          },
+        });
       },
       stopSharing: () => {
         const { shareSession } = get();
-        if (shareSession) set({ shareSession: { ...shareSession, enabled: false, revokedAt: new Date().toISOString() }, masterShare: false });
+        if (shareSession) {
+          set({
+            shareSession: {
+              ...shareSession,
+              enabled: false,
+              revokedAt: new Date().toISOString(),
+              sharePinDisplay: undefined,
+            },
+            masterShare: false,
+          });
+        }
       },
-      verifySharePin: (pin) => {
+      verifySharePin: async (pin) => {
         const { shareSession } = get();
         if (!shareSession || !shareSession.enabled) return false;
+        if (shareSession.revokedAt) return false;
         if (new Date(shareSession.expiresAt) < new Date()) return false;
-        return shareSession.pinHash === hashPin(pin);
+        if (shareSession.lockedUntil && new Date(shareSession.lockedUntil) > new Date()) return false;
+        const ok = await verifyPin(pin, shareSession.pinSalt, shareSession.pinHash);
+        if (!ok) {
+          const attempts = (shareSession.attemptCount || 0) + 1;
+          set({
+            shareSession: {
+              ...shareSession,
+              attemptCount: attempts,
+              lockedUntil:
+                attempts >= 5
+                  ? new Date(Date.now() + 5 * 60 * 1000).toISOString()
+                  : shareSession.lockedUntil,
+            },
+          });
+          return false;
+        }
+        set({ shareSession: { ...shareSession, attemptCount: 0, lockedUntil: undefined } });
+        return true;
       },
       isShareActive: () => {
         const { shareSession } = get();
-        if (!shareSession || !shareSession.enabled) return false;
+        if (!shareSession || !shareSession.enabled || shareSession.revokedAt) return false;
         return new Date(shareSession.expiresAt) > new Date();
       },
       updateSettings: (s) => set((state) => ({ settings: { ...state.settings, ...s } })),
@@ -197,15 +306,27 @@ export const useDogKeyStore = create<DogKeyState>()(
       updateProfile: (name, photo) => {
         const { user } = get();
         if (!user) return;
-        set({ user: { ...user, displayName: name, profilePhoto: photo !== undefined ? photo : user.profilePhoto, updatedAt: new Date().toISOString() } });
+        set({
+          user: {
+            ...user,
+            displayName: name,
+            profilePhoto: photo !== undefined ? photo : user.profilePhoto,
+            updatedAt: new Date().toISOString(),
+          },
+        });
       },
     }),
     {
-      name: 'dogkey-storage',
+      name: 'dogkey-storage-v2',
       partialize: (state) => ({
-        hasOnboarded: state.hasOnboarded, user: state.user, items: state.items,
-        shareSession: state.shareSession ? { ...state.shareSession, sharePinDisplay: undefined } : null,
-        masterShare: state.masterShare, settings: state.settings,
+        hasOnboarded: state.hasOnboarded,
+        user: state.user,
+        items: state.items,
+        shareSession: state.shareSession
+          ? { ...state.shareSession, sharePinDisplay: undefined }
+          : null,
+        masterShare: state.masterShare,
+        settings: state.settings,
       }),
     }
   )
