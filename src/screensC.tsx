@@ -1,20 +1,22 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useDogKeyStore } from './store/useDogKeyStore';
 import { PinPad } from './components/PinPad';
 import { Toggle } from './components/Toggle';
-import type { DogKeyItem } from './types';
 import Icon from './lib/icons';
+import { DogLogo } from './lib/DogLogo';
 import { BottomNav, ItemRow } from './screensA';
 
-function ShareSettingsScreen() {
+export function ShareSettingsScreen() {
   const navigate = useNavigate();
   const { masterShare, setMasterShare, items, setShareEnabled, createShareSession, stopSharing, shareSession, isShareActive } = useDogKeyStore();
-  const [pin, setPin] = useState('4827');
+  const [pin, setPin] = useState('');
   const [validity, setValidity] = useState(60);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
   const categories = [
-    { key: 'Documents', id: 'folder-docs' }, { key: 'Photos', id: 'folder-photos' },
+    { key: 'Documents', id: 'folder-documents' }, { key: 'Photos', id: 'folder-photos' },
     { key: 'Contacts', id: 'folder-contacts' }, { key: 'Links', id: 'folder-links' }, { key: 'Notes', id: 'folder-notes' },
   ];
   return (
@@ -35,7 +37,7 @@ function ShareSettingsScreen() {
       </div>
       {showConfirm && (
         <div className="glass-card" style={{ padding: 20, marginBottom: 16, border: '1px solid var(--accent-gold)' }}>
-          <p style={{ fontSize: 14, marginBottom: 16 }}>Turn on Master Share? This may make your enabled DogKey content available through the active sharing method.</p>
+          <p style={{ fontSize: 14, marginBottom: 16 }}>Turn on Master Share for all enabled content?</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="glass-button secondary" style={{ flex: 1 }} onClick={() => setShowConfirm(false)}>Cancel</button>
             <button className="glass-button" style={{ flex: 1 }} onClick={() => { setMasterShare(true); setShowConfirm(false); }}>Turn On</button>
@@ -67,30 +69,29 @@ function ShareSettingsScreen() {
           </label>
         ))}
       </div>
-      {isShareActive() && (
+      {isShareActive() && shareSession && (
         <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--success)', marginTop: 12 }}>
-          Share active · PIN {shareSession?.sharePinDisplay || '••••'} · expires {shareSession ? new Date(shareSession.expiresAt).toLocaleTimeString() : ''}
+          Active · PIN {shareSession.sharePinDisplay || '••••'} · until {new Date(shareSession.expiresAt).toLocaleString()}
         </p>
       )}
-      <button className="glass-button" style={{ width: '100%', marginTop: 20 }} onClick={() => { createShareSession(pin, validity); navigate('/qr-card'); }} disabled={pin.length !== 4}>Generate QR</button>
+      <button className="glass-button" style={{ width: '100%', marginTop: 20 }} disabled={pin.length !== 4 || busy} onClick={async () => {
+        setBusy(true);
+        try { await createShareSession(pin, validity); navigate('/qr-card'); }
+        finally { setBusy(false); }
+      }}>Generate QR</button>
       {isShareActive() && (
-        <button className="glass-button secondary" style={{ width: '100%', marginTop: 10 }} onClick={() => stopSharing()}>Stop Sharing</button>
+        <button className="glass-button secondary" style={{ width: '100%', marginTop: 10 }} onClick={() => stopSharing()}>Stop All Sharing</button>
       )}
       <BottomNav />
     </div>
   );
 }
 
-function QRCardScreen() {
+export function QRCardScreen() {
   const navigate = useNavigate();
   const { user, shareSession, isShareActive } = useDogKeyStore();
   const active = isShareActive();
-  const qrCells = Array.from({ length: 21 * 21 }, (_, i) => {
-    const x = i % 21; const y = Math.floor(i / 21);
-    const isFinder = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-    const seed = ((x * 7 + y * 13 + (shareSession?.id?.charCodeAt(0) || 0)) % 3) === 0;
-    return isFinder || seed;
-  });
+  const payload = shareSession?.qrPayload || `dogkey://card/${user?.id || 'unknown'}`;
   return (
     <div className="app-bg screen fade-in">
       <div className="app-header">
@@ -99,23 +100,29 @@ function QRCardScreen() {
         <div style={{ width: 40 }} />
       </div>
       <div className="glass-card fade-in" style={{ padding: 24, textAlign: 'center', maxWidth: 320, margin: '0 auto' }}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(145deg,#e8d9c4,#d4b896)', margin: '0 auto 12px' }} />
+        {user?.profilePhoto ? (
+          <img src={user.profilePhoto} alt="" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', margin: '0 auto 12px', display: 'block', border: '2px solid var(--accent-gold)' }} />
+        ) : (
+          <div style={{ margin: '0 auto 12px', display: 'flex', justifyContent: 'center' }}><DogLogo size={64} color="var(--accent-deep)" /></div>
+        )}
         <div style={{ fontWeight: 600, fontSize: 18 }}>{user?.displayName || 'User'}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>DogKey User</div>
-        <div style={{ width: 180, height: 180, margin: '0 auto 16px', display: 'grid', gridTemplateColumns: 'repeat(21, 1fr)', gap: 1, background: '#fff', padding: 8, borderRadius: 8, border: '1px solid var(--card-border)' }}>
-          {qrCells.map((on, i) => <div key={i} style={{ background: on ? '#1a1a1a' : 'transparent', aspectRatio: 1 }} />)}
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>DogKey</div>
+        <div style={{ width: 200, height: 200, margin: '0 auto 16px', background: '#fff', padding: 12, borderRadius: 12, border: '1px solid var(--card-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <QRCodeSVG value={payload} size={176} level="M" bgColor="#ffffff" fgColor="#1a120c" />
         </div>
         {active && shareSession && (
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
             Share PIN: <strong>{shareSession.sharePinDisplay || '••••'}</strong><br />
-            Valid until {new Date(shareSession.expiresAt).toLocaleString()}
+            Until {new Date(shareSession.expiresAt).toLocaleString()}
           </div>
         )}
-        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--accent-brown)', marginTop: 8 }}>DogKey · Your Everything Locker</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+          <DogLogo size={22} color="var(--accent-brown)" />
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--accent-brown)' }}>DogKey · Your Everything Locker</span>
+        </div>
       </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'center' }}>
-        <button className="glass-button secondary" style={{ flex: 1 }}>Save</button>
-        <button className="glass-button secondary" style={{ flex: 1 }}>Print</button>
+        <button className="glass-button secondary" style={{ flex: 1 }} onClick={() => window.print()}>Print</button>
         <button className="glass-button" style={{ flex: 1 }} onClick={() => navigate('/share')}>Share</button>
       </div>
       <BottomNav />
@@ -123,7 +130,7 @@ function QRCardScreen() {
   );
 }
 
-function SharedScreen() {
+export function SharedScreen() {
   const navigate = useNavigate();
   const { getSharedItems, isShareActive, shareSession, stopSharing } = useDogKeyStore();
   const items = getSharedItems();
@@ -152,14 +159,14 @@ function SharedScreen() {
   );
 }
 
-function SettingsScreen() {
+export function SettingsScreen() {
   const navigate = useNavigate();
   const { user, disconnectGoogle, connectGoogle } = useDogKeyStore();
   const rows = [
-    { label: 'Profile', desc: 'Name, Photo', path: null },
-    { label: 'Google Drive', desc: user?.googleConnected ? 'Connected' : 'Not connected', path: null, action: () => user?.googleConnected ? disconnectGoogle() : connectGoogle() },
+    { label: 'Profile', desc: 'Name, Photo', path: '/profile' },
+    { label: 'Google Drive', desc: user?.googleConnected ? `Connected · ${user.googleEmail || ''}` : 'Not connected — needs OAuth client', action: () => user?.googleConnected ? disconnectGoogle() : connectGoogle() },
     { label: 'Security', desc: 'PIN, Lock, Privacy', path: '/security' },
-    { label: 'Backup & Sync', desc: '', path: null },
+    { label: 'Backup & Sync', desc: user?.googleConnected ? 'Drive linked' : 'Local only until Drive connected', path: null as string | null },
     { label: 'About DogKey', desc: '', path: '/about' },
   ];
   return (
@@ -179,7 +186,7 @@ function SettingsScreen() {
   );
 }
 
-function SecurityScreen() {
+export function SecurityScreen() {
   const navigate = useNavigate();
   const { settings, updateSettings, changeLoginPin } = useDogKeyStore();
   const [mode, setMode] = useState<'menu' | 'login-pin'>('menu');
@@ -194,13 +201,13 @@ function SecurityScreen() {
           <div style={{ fontWeight: 600 }}>Change Login PIN</div>
           <div style={{ width: 40 }} />
         </div>
-        <p className="screen-subtitle">{step === 0 ? 'Enter current DogKey Login PIN' : step === 1 ? 'Enter new DogKey Login PIN' : 'Confirm new PIN'}</p>
-        <PinPad value={step === 0 ? oldPin : newPin} onChange={step === 0 ? setOldPin : setNewPin} maxLength={4} onComplete={(p) => {
+        <p className="screen-subtitle">{step === 0 ? 'Current Login PIN' : step === 1 ? 'New Login PIN' : 'Confirm new PIN'}</p>
+        <PinPad value={step === 0 ? oldPin : newPin} onChange={step === 0 ? setOldPin : setNewPin} maxLength={4} onComplete={async (p) => {
           if (step === 0) { setOldPin(p); setStep(1); setNewPin(''); }
           else if (step === 1) { setNewPin(p); setStep(2); }
           else {
-            if (p === newPin && changeLoginPin(oldPin, newPin)) { alert('DogKey Login PIN updated'); setMode('menu'); }
-            else { alert('Failed — check current PIN or confirmation'); setStep(0); setOldPin(''); setNewPin(''); }
+            if (p === newPin && (await changeLoginPin(oldPin, newPin))) { setMode('menu'); }
+            else { setStep(0); setOldPin(''); setNewPin(''); }
           }
         }} />
       </div>
@@ -214,15 +221,12 @@ function SecurityScreen() {
         <div style={{ width: 40 }} />
       </div>
       <div className="list-item" onClick={() => setMode('login-pin')}>
-        <div style={{ flex: 1 }}><div style={{ fontWeight: 600 }}>Change Login PIN</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>DogKey Login PIN</div></div>
+        <div style={{ flex: 1 }}><div style={{ fontWeight: 600 }}>Change Login PIN</div></div>
         <span>›</span>
       </div>
       <div className="list-item" style={{ cursor: 'default' }}>
         <div style={{ flex: 1 }}><div style={{ fontWeight: 600 }}>Biometric Lock</div></div>
         <Toggle on={settings.biometricLock} onChange={(v) => updateSettings({ biometricLock: v })} />
-      </div>
-      <div className="list-item" style={{ cursor: 'default' }}>
-        <div style={{ flex: 1 }}><div style={{ fontWeight: 600 }}>Auto Lock</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{settings.autoLockMinutes} Minute</div></div>
       </div>
       <div className="list-item" style={{ cursor: 'default' }}>
         <div style={{ flex: 1 }}><div style={{ fontWeight: 600 }}>Hide App Content</div></div>
@@ -232,46 +236,47 @@ function SecurityScreen() {
   );
 }
 
-function AboutScreen() {
+export function AboutScreen() {
   const navigate = useNavigate();
   return (
     <div className="app-bg screen fade-in" style={{ textAlign: 'center', paddingTop: 48 }}>
-      <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(145deg,#e8d9c4,#d4b896)', margin: '0 auto 16px' }} />
-      <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28 }}>DogKey™</h1>
+      <DogLogo size={72} color="var(--accent-deep)" />
+      <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, marginTop: 12 }}>DogKey™</h1>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>Your Everything Locker</p>
-      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 32 }}>Version 1.0.0</p>
-      {['Privacy Policy', 'Terms & Conditions', 'Help & Support'].map((t) => (
-        <div key={t} className="list-item" style={{ textAlign: 'left' }}><div style={{ flex: 1, fontWeight: 500 }}>{t}</div><span>›</span></div>
-      ))}
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 32 }}>Version 1.1.0</p>
       <button className="glass-button secondary" style={{ marginTop: 24 }} onClick={() => navigate(-1)}>Back</button>
     </div>
   );
 }
 
-function ReceiverPinScreen() {
+export function ReceiverPinScreen() {
   const navigate = useNavigate();
   const { user, verifySharePin, isShareActive, shareSession } = useDogKeyStore();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
-  const handle = (p: string) => {
+  const handle = async (p: string) => {
     if (!isShareActive()) { setError(shareSession?.revokedAt ? 'Sharing Disabled' : 'Share Expired'); setPin(''); return; }
-    if (verifySharePin(p)) navigate('/shared-content');
+    if (await verifySharePin(p)) navigate('/shared-content');
     else { setError('Incorrect Share PIN'); setPin(''); }
   };
   return (
     <div className="app-bg screen full fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48 }}>
-      <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(145deg,#e8d9c4,#d4b896)', marginBottom: 12 }} />
-      <div style={{ fontWeight: 600, fontSize: 18 }}>{user?.displayName || 'Owner'}</div>
+      {user?.profilePhoto ? (
+        <img src={user.profilePhoto} alt="" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, border: '2px solid var(--accent-gold)' }} />
+      ) : (
+        <DogLogo size={72} color="var(--accent-deep)" />
+      )}
+      <div style={{ fontWeight: 600, fontSize: 18, marginTop: 8 }}>{user?.displayName || 'Owner'}</div>
       <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 8 }}>is sharing with you</p>
       <p className="screen-subtitle">Enter Share PIN</p>
       {error && <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 8 }}>{error}</p>}
-      <PinPad value={pin} onChange={setPin} maxLength={4} onComplete={handle} />
-      <button className="glass-button" style={{ marginTop: 24, width: 240 }} onClick={() => pin.length === 4 && handle(pin)}>Open Shared Content</button>
+      <PinPad value={pin} onChange={setPin} maxLength={4} onComplete={(p) => { void handle(p); }} />
+      <button className="glass-button" style={{ marginTop: 24, width: 240 }} onClick={() => pin.length === 4 && void handle(pin)}>Open Shared Content</button>
     </div>
   );
 }
 
-function SharedContentScreen() {
+export function SharedContentScreen() {
   const navigate = useNavigate();
   const { getSharedItems } = useDogKeyStore();
   const items = getSharedItems();
@@ -287,11 +292,40 @@ function SharedContentScreen() {
   );
 }
 
-function RequireAuth({ children }: { children: import("react").ReactNode }) {
+export function ProfileScreen() {
+  const navigate = useNavigate();
+  const { user, updateProfile } = useDogKeyStore();
+  const [name, setName] = useState(user?.displayName || '');
+  const [photo, setPhoto] = useState<string | null>(user?.profilePhoto || null);
+  const pickPhoto = async () => {
+    const { pickFromGallery, takePhoto } = await import('./lib/media');
+    const useCam = window.confirm('OK = Camera · Cancel = Gallery');
+    const media = useCam ? await takePhoto() : await pickFromGallery();
+    if (media) setPhoto(media.dataUrl);
+  };
+  return (
+    <div className="app-bg screen fade-in">
+      <div className="app-header">
+        <button className="header-back" onClick={() => navigate(-1)}><Icon.Back /></button>
+        <div style={{ fontWeight: 600 }}>Profile</div>
+        <div style={{ width: 40 }} />
+      </div>
+      <div className="glass-card" style={{ padding: 24, textAlign: 'center' }}>
+        <div onClick={() => void pickPhoto()} style={{ width: 96, height: 96, borderRadius: '50%', margin: '0 auto 16px', overflow: 'hidden', border: '2px solid var(--accent-gold)', cursor: 'pointer', background: 'linear-gradient(145deg,#e8d9c4,#d4b896)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {photo ? <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <DogLogo size={48} color="var(--accent-deep)" />}
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Tap photo to change</p>
+        <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Display name" />
+        {photo && <button className="glass-button secondary" style={{ width: '100%', marginTop: 12 }} onClick={() => setPhoto(null)}>Remove photo</button>}
+        <button className="glass-button" style={{ width: '100%', marginTop: 16 }} onClick={() => { updateProfile(name.trim() || 'User', photo); navigate(-1); }}>Save Profile</button>
+      </div>
+    </div>
+  );
+}
+
+export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { hasOnboarded, isUnlocked } = useDogKeyStore();
   if (!hasOnboarded) return <Navigate to="/welcome" replace />;
   if (!isUnlocked) return <Navigate to="/unlock" replace />;
   return <>{children}</>;
 }
-
-export { ShareSettingsScreen, QRCardScreen, SharedScreen, SettingsScreen, SecurityScreen, AboutScreen, ReceiverPinScreen, SharedContentScreen, RequireAuth };
