@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DogKeyUser, DogKeyItem, ShareSession, AppSettings, ItemType } from '../types';
 import { generateSalt, derivePinHash, verifyPin, buildShareQrPayload } from '../lib/crypto';
+import { protectContent, getSessionDataKey } from '../lib/secureVault';
 
 function uid() {
   return crypto.randomUUID();
@@ -10,7 +11,7 @@ function uid() {
 function seedFolders(): DogKeyItem[] {
   const now = new Date().toISOString();
   const roots = ['Documents', 'Photos', 'Videos', 'Contacts', 'Links', 'Notes'];
-  return roots.map((title, i) => ({
+  const items: DogKeyItem[] = roots.map((title, i) => ({
     id: `folder-${title.toLowerCase()}`,
     parentId: null,
     type: 'folder' as const,
@@ -20,6 +21,7 @@ function seedFolders(): DogKeyItem[] {
     createdAt: now,
     updatedAt: now,
   }));
+  return items;
 }
 
 interface DogKeyState {
@@ -39,7 +41,7 @@ interface DogKeyState {
   changeLoginPin: (oldPin: string, newPin: string) => Promise<boolean>;
   connectGoogle: () => void;
   disconnectGoogle: () => void;
-  addItem: (item: Partial<DogKeyItem> & { type: ItemType; title: string }) => string;
+  addItem: (item: Partial<DogKeyItem> & { type: ItemType; title: string }) => Promise<string>;
   updateItem: (id: string, updates: Partial<DogKeyItem>) => void;
   deleteItem: (id: string) => void;
   moveItem: (id: string, newParentId: string | null) => void;
@@ -76,20 +78,17 @@ export const useDogKeyStore = create<DogKeyState>()(
       createUser: async (name, pin) => {
         const salt = await generateSalt();
         const loginPinHash = await derivePinHash(pin, salt);
-        set({
-          user: {
-            id: uid(),
-            displayName: name || 'User',
-            profilePhoto: null,
-            loginPinHash,
-            loginPinSalt: salt,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            googleConnected: false,
-          },
-          hasOnboarded: true,
-          isUnlocked: true,
-        });
+        const user: DogKeyUser = {
+          id: uid(),
+          displayName: name || 'User',
+          profilePhoto: null,
+          loginPinHash,
+          loginPinSalt: salt,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          googleConnected: false,
+        };
+        set({ user, hasOnboarded: true, isUnlocked: true });
       },
       verifyLoginPin: async (pin) => {
         const { user } = get();
@@ -99,14 +98,15 @@ export const useDogKeyStore = create<DogKeyState>()(
       changeLoginPin: async (oldPin, newPin) => {
         const { user } = get();
         if (!user?.loginPinHash || !user.loginPinSalt) return false;
-        if (!(await verifyPin(oldPin, user.loginPinSalt, user.loginPinHash))) return false;
+        const ok = await verifyPin(oldPin, user.loginPinSalt, user.loginPinHash);
+        if (!ok) return false;
         const salt = await generateSalt();
         const loginPinHash = await derivePinHash(newPin, salt);
         set({ user: { ...user, loginPinHash, loginPinSalt: salt, updatedAt: new Date().toISOString() } });
         return true;
       },
       connectGoogle: () => {
-        console.warn('[DogKey] Google Drive requires valid Android OAuth client (com.dogkey.app + SHA-1).');
+        console.warn('[DogKey] Google Drive requires a valid Android OAuth client (com.dogkey.app + SHA-1).');
       },
       disconnectGoogle: () => {
         const { user } = get();
@@ -122,8 +122,15 @@ export const useDogKeyStore = create<DogKeyState>()(
           },
         });
       },
-      addItem: (partial) => {
+      addItem: async (partial) => {
         const id = uid();
+        // Encrypt sensitive payloads when vault is unlocked (AES-GCM + Keystore-backed key)
+        let content = partial.content;
+        let notes = partial.notes;
+        if (getSessionDataKey()) {
+          if (content) content = await protectContent(content);
+          if (notes) notes = await protectContent(notes);
+        }
         const item: DogKeyItem = {
           id,
           parentId: partial.parentId ?? get().currentFolderId,
@@ -131,7 +138,7 @@ export const useDogKeyStore = create<DogKeyState>()(
           title: partial.title,
           description: partial.description,
           mimeType: partial.mimeType,
-          content: partial.content,
+          content,
           thumbnail: partial.thumbnail,
           url: partial.url,
           mobile: partial.mobile,
@@ -139,7 +146,7 @@ export const useDogKeyStore = create<DogKeyState>()(
           email: partial.email,
           address: partial.address,
           website: partial.website,
-          notes: partial.notes,
+          notes,
           shareEnabled: partial.shareEnabled ?? false,
           sortOrder: Date.now(),
           createdAt: new Date().toISOString(),
@@ -151,7 +158,9 @@ export const useDogKeyStore = create<DogKeyState>()(
       },
       updateItem: (id, updates) => {
         set((s) => ({
-          items: s.items.map((it) => (it.id === id ? { ...it, ...updates, updatedAt: new Date().toISOString() } : it)),
+          items: s.items.map((it) =>
+            it.id === id ? { ...it, ...updates, updatedAt: new Date().toISOString() } : it
+          ),
         }));
       },
       deleteItem: (id) => {
@@ -222,7 +231,7 @@ export const useDogKeyStore = create<DogKeyState>()(
             it.content?.toLowerCase().includes(lower) ||
             it.url?.toLowerCase().includes(lower) ||
             it.email?.toLowerCase().includes(lower) ||
-            it.mobile?.includes(lower)
+            it.notes?.toLowerCase().includes(lower)
         );
       },
       setMasterShare: (on) => set({ masterShare: on }),
@@ -285,10 +294,7 @@ export const useDogKeyStore = create<DogKeyState>()(
             shareSession: {
               ...shareSession,
               attemptCount: attempts,
-              lockedUntil:
-                attempts >= 5
-                  ? new Date(Date.now() + 5 * 60 * 1000).toISOString()
-                  : shareSession.lockedUntil,
+              lockedUntil: attempts >= 5 ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : shareSession.lockedUntil,
             },
           });
           return false;
