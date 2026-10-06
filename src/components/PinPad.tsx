@@ -25,7 +25,7 @@ export function PinPad({ value, onChange, maxLength = 4, onComplete }: PinPadPro
 
   return (
     <div className="pin-pad-wrap">
-      <div className="pin-dots">
+      <div className="pin-display">
         {Array.from({ length: maxLength }).map((_, i) => (
           <div key={i} className={`pin-dot ${i < value.length ? 'filled' : ''}`} />
         ))}

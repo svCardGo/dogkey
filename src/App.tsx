@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SplashScreen, WelcomeScreen, CreatePinScreen, UnlockScreen, ConnectDriveScreen } from './screensA';
 import { HomeScreen, FolderScreen, AddNewScreen, AddContactScreen, AddLinkScreen, AddNoteScreen } from './screensB';
-import { ShareSettingsScreen, QRCardScreen, SharedScreen, SettingsScreen, SecurityScreen, AboutScreen, ReceiverPinScreen, SharedContentScreen, RequireAuth, ProfileScreen } from './screensC';
+import { ShareSettingsScreen, QRCardScreen, SharedScreen, SettingsScreen, SecurityScreen, AboutScreen, ReceiverPinScreen, SharedContentScreen, RequireAuth, ProfileScreen, AIScreen } from './screensC';
 
 export default function App() {
   return (
@@ -21,6 +21,7 @@ export default function App() {
         <Route path="/share" element={<RequireAuth><ShareSettingsScreen /></RequireAuth>} />
         <Route path="/qr-card" element={<RequireAuth><QRCardScreen /></RequireAuth>} />
         <Route path="/shared" element={<RequireAuth><SharedScreen /></RequireAuth>} />
+        <Route path="/ai" element={<RequireAuth><AIScreen /></RequireAuth>} />
         <Route path="/profile" element={<RequireAuth><ProfileScreen /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><SettingsScreen /></RequireAuth>} />
         <Route path="/security" element={<RequireAuth><SecurityScreen /></RequireAuth>} />
