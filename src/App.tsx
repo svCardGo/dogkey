@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SplashScreen, WelcomeScreen, CreatePinScreen, UnlockScreen, ConnectDriveScreen } from './screensA';
 import { HomeScreen, FolderScreen, AddNewScreen, AddContactScreen, AddLinkScreen, AddNoteScreen } from './screensB';
-import { ShareSettingsScreen, QRCardScreen, SharedScreen, SettingsScreen, SecurityScreen, AboutScreen, ReceiverPinScreen, SharedContentScreen, RequireAuth, ProfileScreen, AIScreen } from './screensC';
+import { ShareSettingsScreen, QRCardScreen, SharedScreen, SettingsScreen, SecurityScreen, AboutScreen, ReceiverPinScreen, SharedContentScreen, RequireAuth, ProfileScreen } from './screensC';
+import { AIScreen } from './AIScreen';
 
 export default function App() {
   return (
