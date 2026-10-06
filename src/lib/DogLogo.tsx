@@ -1,4 +1,8 @@
-/** DogKey brand mark — text only, no dog/animal/key graphics */
+/**
+ * DogKey™ brand mark — TEXT ONLY.
+ * No dog · no key · no mascot · no animal imagery.
+ * Clean "DK" circle mark for rare icon contexts.
+ */
 import React from 'react';
 
 interface DogLogoProps {
@@ -8,31 +12,34 @@ interface DogLogoProps {
   color?: string;
 }
 
-/** Renders a simple circular "DK" text mark — never a dog drawing */
 export function DogLogo({
   size = 48,
   className = '',
-  color = 'var(--green, #2d9f6f)',
+  variant = 'mark',
+  color = 'currentColor',
 }: DogLogoProps) {
-  const s = typeof size === 'number' ? size : 48;
+  const s = typeof size === 'number' ? size : undefined;
+  const fontSize = typeof size === 'number' ? Math.round(size * 0.36) : '36%';
+
   return (
     <div
       className={className}
       style={{
-        width: s,
-        height: s,
+        width: size,
+        height: size,
         borderRadius: '50%',
-        background: 'var(--green-soft, #e8f6ef)',
-        color: color,
-        border: '1.5px solid var(--border, #e5e7e5)',
-        display: 'flex',
+        border: `1.5px solid ${color === 'currentColor' ? 'var(--border-strong)' : color}`,
+        background: 'var(--bg, #ffffff)',
+        color: color === 'currentColor' ? 'var(--text, #000)' : color,
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
+        fontFamily: 'var(--font, Inter, system-ui, sans-serif)',
         fontWeight: 700,
-        fontSize: s * 0.32,
-        fontFamily: "'Inter', system-ui, sans-serif",
-        letterSpacing: '-0.02em',
+        fontSize,
+        letterSpacing: '-0.04em',
         flexShrink: 0,
+        lineHeight: 1,
       }}
       aria-label="DogKey"
       role="img"
@@ -44,25 +51,22 @@ export function DogLogo({
 
 export function DogLogoWordmark({
   size = 28,
-  color = 'var(--text, #000)',
+  color = 'var(--text)',
 }: {
   size?: number;
   color?: string;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <DogLogo size={size} color="var(--green, #2d9f6f)" />
-      <span
-        style={{
-          fontFamily: "'Inter', system-ui, sans-serif",
-          fontSize: size * 0.72,
-          fontWeight: 700,
-          letterSpacing: '-0.02em',
-          color,
-        }}
-      >
-        DogKey
-      </span>
-    </div>
+    <span
+      style={{
+        fontFamily: 'var(--font, Inter, system-ui, sans-serif)',
+        fontSize: size * 0.85,
+        fontWeight: 700,
+        letterSpacing: '-0.02em',
+        color,
+      }}
+    >
+      DogKey<span style={{ fontSize: '0.55em', verticalAlign: 'super', color: 'var(--green)', fontWeight: 600 }}>™</span>
+    </span>
   );
 }
