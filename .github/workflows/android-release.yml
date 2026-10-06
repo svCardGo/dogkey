@@ -1,0 +1,131 @@
+name: Build DogKey Release APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install npm dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Setup Java (JDK 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
+
+      - name: Capacitor Android
+        run: |
+          if [ ! -d android ]; then npx cap add android; fi
+          npx cap sync android
+
+      - name: Force release: debuggable false + camera perms
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          t = p.read_text()
+          t = t.replace('android:debuggable="true"', 'android:debuggable="false"')
+          if "CAMERA" not in t:
+              perms = '''    <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-feature android:name="android.hardware.camera" android:required="false" />
+          '''
+              t = t.replace("<application", perms + "\n    <application", 1)
+          p.write_text(t)
+          print("manifest hardened")
+          PY
+
+      - name: Configure release signing from secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "Missing ANDROID_KEYSTORE_BASE64 secret — cannot release-sign"
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/dogkey-release.keystore
+          cat > android/keystore.properties <<EOF
+          storeFile=dogkey-release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+          # Inject signingConfigs into app build.gradle if not present
+          BG=android/app/build.gradle
+          if ! grep -q dogkey-release "$BG" 2>/dev/null; then
+            python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle")
+          t = p.read_text()
+          signing = '''
+      def ks = file("../keystore.properties")
+      if (ks.exists()) {
+          def props = new Properties()
+          props.load(new FileInputStream(ks))
+          signingConfigs {
+              release {
+                  storeFile file(props['storeFile'])
+                  storePassword props['storePassword']
+                  keyAlias props['keyAlias']
+                  keyPassword props['keyPassword']
+              }
+          }
+          buildTypes.release.signingConfig signingConfigs.release
+      }
+          '''
+          # insert before closing of android block is fragile; append after android {
+          t = t.replace("android {", "android {" + signing, 1)
+          p.write_text(t)
+          print("signingConfigs injected")
+          PY
+          fi
+
+      - name: Assemble Release
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Collect + verify release APK
+        run: |
+          set -e
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          test -f "$APK"
+          mkdir -p artifacts
+          cp "$APK" artifacts/DogKey-SUPREME-RELEASE.apk
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs artifacts/DogKey-SUPREME-RELEASE.apk | head -20
+          sha256sum artifacts/DogKey-SUPREME-RELEASE.apk
+
+      - name: Upload DogKey-SUPREME-RELEASE.apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: DogKey-SUPREME-RELEASE.apk
+          path: artifacts/DogKey-SUPREME-RELEASE.apk
+          retention-days: 30
