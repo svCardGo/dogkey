@@ -1,0 +1,97 @@
+name: Build DogKey Android APK
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build web assets (Vite → dist/)
+        run: npm run build
+
+      - name: Verify dist/ exists
+        run: |
+          test -d dist && ls -la dist/ | head -20
+          test -f dist/index.html
+
+      - name: Setup Java (JDK 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Add Capacitor Android platform (if missing)
+        run: |
+          if [ ! -d "android" ]; then
+            echo "Adding Capacitor Android platform (com.dogkey.app / DogKey)..."
+            npx cap add android
+          else
+            echo "android/ already present — skipping cap add"
+          fi
+
+      - name: Capacitor sync (web assets → native)
+        run: npx cap sync android
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Debug APK (assembleDebug)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Collect and rename APK → DogKey-debug.apk
+        run: |
+          set -e
+          APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          echo "Located APK: $APK_PATH"
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "ERROR: APK not found"
+            find android -name "*.apk" 2>/dev/null || true
+            exit 1
+          fi
+          mkdir -p artifacts
+          cp "$APK_PATH" artifacts/DogKey-debug.apk
+          echo "Artifact ready:"
+          ls -lh artifacts/DogKey-debug.apk
+
+      - name: Upload DogKey-debug.apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: DogKey-debug.apk
+          path: artifacts/DogKey-debug.apk
+          retention-days: 30
+          if-no-files-found: error
