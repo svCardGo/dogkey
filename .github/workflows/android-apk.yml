@@ -16,6 +16,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply cinematic UI overlay
+        run: python3 scripts/inject_cinematic_ui.py
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -61,26 +64,26 @@ jobs:
       - name: Android camera permissions
         run: |
           python3 - <<'PY'
-from pathlib import Path
-p = Path("android/app/src/main/AndroidManifest.xml")
-if not p.exists():
-    print("no manifest yet")
-    raise SystemExit(0)
-t = p.read_text()
-if "CAMERA" in t:
-    print("permissions already present")
-else:
-    perms = '''    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-'''
-    t = t.replace("<application", perms + "\n    <application", 1)
-    p.write_text(t)
-    print("permissions injected")
-PY
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          if not p.exists():
+              print("no manifest yet")
+              raise SystemExit(0)
+          t = p.read_text()
+          if "CAMERA" in t:
+              print("permissions already present")
+          else:
+              perms = """    <uses-permission android:name=\"android.permission.CAMERA\" />
+              <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" />
+              <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" />
+              <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />
+          """
+              t = t.replace("<application", perms + "\n    <application", 1)
+              p.write_text(t)
+              print("permissions injected")
+          PY
 
-      - name: Report debug keystore SHA-1 (for Google OAuth)
+      - name: Report debug keystore SHA-1
         run: |
           KEYSTORE="${HOME}/.android/debug.keystore"
           if [ ! -f "$KEYSTORE" ]; then
@@ -89,12 +92,8 @@ PY
               -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US" || true
           fi
-          echo "=== DogKey Android OAuth setup ==="
           echo "Package: com.dogkey.app"
-          echo "SHA-1 (debug):"
           keytool -list -v -keystore "$KEYSTORE" -alias androiddebugkey -storepass android -keypass android 2>/dev/null | grep -E "SHA1:|SHA-1:" || true
-          echo "Create Android OAuth client in Google Cloud with this package + SHA-1"
-          echo "================================="
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
