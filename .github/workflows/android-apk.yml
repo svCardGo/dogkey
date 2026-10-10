@@ -37,7 +37,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
@@ -119,8 +118,6 @@ jobs:
           cp "$APK_PATH" artifacts/app-debug.apk
           cp "$APK_PATH" artifacts/DogKey-CLEAN.apk
           ls -lh artifacts/
-          # Record path for logs
-          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
 
       - name: Upload app-debug.apk
         uses: actions/upload-artifact@v4
