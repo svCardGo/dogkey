@@ -3,119 +3,72 @@ name: Build DogKey Android APK
 on:
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Verify DocBox UI files present
+      - name: Confirm DocBox UI on main
         run: |
           test -f src/docbox.css
           test -f src/screensB.tsx
-          grep -q 'docbox-root\|db-card\|docbox-dock' src/screensB.tsx src/docbox.css
-          echo "DocBox UI sources OK"
+          grep -n docbox-root src/screensB.tsx | head -3
+          grep -n db-card src/docbox.css | head -3
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install npm dependencies
-        run: npm install --legacy-peer-deps
+      - run: npm install --legacy-peer-deps
 
-      - name: Build web assets (Vite → dist/)
-        run: npm run build
+      - run: npm run build
 
-      - name: Verify dist/ exists
-        run: |
-          test -d dist && ls -la dist/ | head -20
-          test -f dist/index.html
+      - run: test -f dist/index.html
 
-      - name: Setup Java (JDK 21)
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
 
-      - name: Setup Android SDK packages
+      - name: Android SDK
         run: |
           export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platform-tools" \
-            "platforms;android-34" \
-            "platforms;android-35" \
-            "build-tools;34.0.0" \
-            "build-tools;35.0.0" || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
 
-      - name: Add Capacitor Android platform (if missing)
+      - name: Capacitor android
         run: |
-          if [ ! -d "android" ]; then
-            npx cap add android
+          if [ ! -d android ]; then npx cap add android; fi
+          npx cap sync android
+
+      - name: Permissions
+        run: |
+          MAN=android/app/src/main/AndroidManifest.xml
+          if [ -f "$MAN" ] && ! grep -q CAMERA "$MAN"; then
+            sed -i 's|<application|    <uses-permission android:name="android.permission.CAMERA" />\n    <application|' "$MAN"
           fi
 
-      - name: Capacitor sync
-        run: npx cap sync android
-
-      - name: Android camera permissions
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          if not p.exists():
-              raise SystemExit(0)
-          t = p.read_text()
-          t = t.replace('android:debuggable="true"', 'android:debuggable="false"')
-          if "CAMERA" not in t:
-              perms = '''    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-'''
-              t = t.replace("<application", perms + "\n    <application", 1)
-          p.write_text(t)
-          PY
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Build Debug APK
+      - name: assembleDebug
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Collect APK
+      - name: Upload APK
         run: |
-          set -e
-          APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
-          echo "Located APK: $APK_PATH"
-          test -f "$APK_PATH"
+          APK=$(find android/app/build/outputs/apk -name '*.apk' | head -1)
+          test -f "$APK"
           mkdir -p artifacts
-          cp "$APK_PATH" artifacts/DogKey-DocBox-UI.apk
-          cp "$APK_PATH" artifacts/app-debug.apk
+          cp "$APK" artifacts/DogKey-DocBox-UI.apk
           ls -lh artifacts/
 
-      - name: Upload DogKey-DocBox-UI.apk
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: DogKey-DocBox-UI.apk
           path: artifacts/DogKey-DocBox-UI.apk
           retention-days: 30
-          if-no-files-found: error
-
-      - name: Upload app-debug.apk
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug.apk
-          path: artifacts/app-debug.apk
-          retention-days: 30
-          if-no-files-found: error
