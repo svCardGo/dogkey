@@ -15,37 +15,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Use original UI from known-good commit
+      - name: Verify DocBox UI files present
         run: |
-          set -e
-          GOOD=f24775f0699ac95e832bae10798ff62f9811ec9e
-          git checkout "$GOOD" -- src/screensA.tsx src/screensB.tsx src/main.tsx || {
-            echo "Failed to restore from $GOOD"
-            exit 1
-          }
-          rm -f src/docbox.css src/screensB-home-patch.md
-          echo "Restored original UI files from $GOOD"
-          head -5 src/screensB.tsx
-
-      - name: Strip dog emoji only (safe)
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for rel in ('src/screensA.tsx', 'src/screensB.tsx', 'src/screensC.tsx'):
-              p = Path(rel)
-              if not p.exists():
-                  continue
-              t = p.read_text()
-              t2 = t.replace('🐕', '').replace('🐶', '')
-              if t2 != t:
-                  p.write_text(t2)
-                  print('emoji stripped', rel)
-              else:
-                  print('ok', rel)
-          PY
+          test -f src/docbox.css
+          test -f src/screensB.tsx
+          grep -q 'docbox-root\|db-card\|docbox-dock' src/screensB.tsx src/docbox.css
+          echo "DocBox UI sources OK"
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
@@ -63,7 +39,7 @@ jobs:
           test -d dist && ls -la dist/ | head -20
           test -f dist/index.html
 
-      - name: Setup Java (JDK 21 — required by Capacitor Android)
+      - name: Setup Java (JDK 21)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -72,9 +48,7 @@ jobs:
       - name: Setup Android SDK packages
         run: |
           export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          export ANDROID_SDK_ROOT="$ANDROID_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
@@ -94,57 +68,54 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
-      - name: Android camera permissions + debuggable false
+      - name: Android camera permissions
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("android/app/src/main/AndroidManifest.xml")
           if not p.exists():
-              print("no manifest yet")
               raise SystemExit(0)
           t = p.read_text()
           t = t.replace('android:debuggable="true"', 'android:debuggable="false"')
           if "CAMERA" not in t:
               perms = '''    <uses-permission android:name="android.permission.CAMERA" />
-              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-              <uses-feature android:name="android.hardware.camera" android:required="false" />
-          '''
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+'''
               t = t.replace("<application", perms + "\n    <application", 1)
           p.write_text(t)
-          print("manifest hardened")
           PY
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build Debug APK (assembleDebug)
+      - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Collect APK artifacts
+      - name: Collect APK
         run: |
           set -e
           APK_PATH=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
           echo "Located APK: $APK_PATH"
           test -f "$APK_PATH"
           mkdir -p artifacts
+          cp "$APK_PATH" artifacts/DogKey-DocBox-UI.apk
           cp "$APK_PATH" artifacts/app-debug.apk
-          cp "$APK_PATH" artifacts/DogKey-original-ui.apk
           ls -lh artifacts/
+
+      - name: Upload DogKey-DocBox-UI.apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: DogKey-DocBox-UI.apk
+          path: artifacts/DogKey-DocBox-UI.apk
+          retention-days: 30
+          if-no-files-found: error
 
       - name: Upload app-debug.apk
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk
           path: artifacts/app-debug.apk
-          retention-days: 30
-          if-no-files-found: error
-
-      - name: Upload DogKey-original-ui.apk
-        uses: actions/upload-artifact@v4
-        with:
-          name: DogKey-original-ui.apk
-          path: artifacts/DogKey-original-ui.apk
           retention-days: 30
           if-no-files-found: error
