@@ -1,0 +1,223 @@
+/* DocBox mockup shell — dark chrome + soft rounded cards */
+.docbox-app {
+  min-height: 100dvh;
+  background: #0c0c0c;
+  color: #f4f0e6;
+  padding-bottom: 88px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.docbox-brand {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.docbox-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 12px 14px 10px;
+  background: rgba(12, 12, 12, 0.94);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.docbox-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.docbox-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.docbox-key-mark { font-size: 1.25rem; }
+.docbox-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.docbox-icon-btn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  background: transparent;
+  color: rgba(244, 240, 230, 0.9);
+  font-size: 1.15rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.docbox-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+.docbox-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.docbox-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 10px 14px;
+}
+.docbox-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #f4f0e6;
+  font-size: 15px;
+  outline: none;
+}
+.docbox-search input::placeholder { color: rgba(244, 240, 230, 0.4); }
+.docbox-main { padding: 14px 12px; }
+.docbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.docbox-single {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.docbox-card {
+  background: #f3f0e8;
+  color: #141816;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 12px 28px -16px rgba(0, 0, 0, 0.55);
+}
+.docbox-card-media {
+  position: relative;
+  aspect-ratio: 1;
+  background: #1a1a1a;
+  cursor: pointer;
+}
+.docbox-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.docbox-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(244, 240, 230, 0.45);
+  font-size: 12px;
+  text-align: center;
+  padding: 12px;
+}
+.docbox-badge {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  z-index: 2;
+  font-family: Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.docbox-eye {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 2;
+  font-size: 1rem;
+}
+.docbox-side-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+}
+.docbox-card-foot {
+  padding: 8px 10px 12px;
+}
+.docbox-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.docbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px;
+}
+.docbox-mini {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 24, 22, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.docbox-dock {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  max-width: 456px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 4px;
+  border-radius: 999px;
+  background: rgba(12, 12, 12, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  z-index: 40;
+}
+.docbox-dock-item {
+  flex: 1;
+  min-height: 48px;
+  border: none;
+  background: transparent;
+  color: rgba(244, 240, 230, 0.55);
+  font-size: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.docbox-dock-item.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f0e6;
+}
+.docbox-dock-count {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.docbox-muted { color: rgba(244, 240, 230, 0.55); font-size: 13px; }
