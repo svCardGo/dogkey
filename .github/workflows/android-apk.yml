@@ -15,6 +15,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use original UI from known-good commit
+        run: |
+          set -e
+          GOOD=f24775f0699ac95e832bae10798ff62f9811ec9e
+          git checkout "$GOOD" -- src/screensA.tsx src/screensB.tsx src/main.tsx || {
+            echo "Failed to restore from $GOOD"
+            exit 1
+          }
+          rm -f src/docbox.css src/screensB-home-patch.md
+          echo "Restored original UI files from $GOOD"
+          head -5 src/screensB.tsx
 
       - name: Strip dog emoji only (safe)
         run: |
@@ -49,8 +63,6 @@ jobs:
           test -d dist && ls -la dist/ | head -20
           test -f dist/index.html
 
-      # Capacitor Android (@capacitor/android 7) compiles with --release 21.
-      # JDK 17 fails with: error: invalid source release: 21
       - name: Setup Java (JDK 21 — required by Capacitor Android)
         uses: actions/setup-java@v4
         with:
@@ -118,7 +130,7 @@ jobs:
           test -f "$APK_PATH"
           mkdir -p artifacts
           cp "$APK_PATH" artifacts/app-debug.apk
-          cp "$APK_PATH" artifacts/DogKey-CLEAN.apk
+          cp "$APK_PATH" artifacts/DogKey-original-ui.apk
           ls -lh artifacts/
 
       - name: Upload app-debug.apk
@@ -129,10 +141,10 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Upload DogKey-CLEAN.apk
+      - name: Upload DogKey-original-ui.apk
         uses: actions/upload-artifact@v4
         with:
-          name: DogKey-CLEAN.apk
-          path: artifacts/DogKey-CLEAN.apk
+          name: DogKey-original-ui.apk
+          path: artifacts/DogKey-original-ui.apk
           retention-days: 30
           if-no-files-found: error
