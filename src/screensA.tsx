@@ -6,26 +6,42 @@ import type { DogKeyItem } from './types';
 import Icon from './lib/icons';
 import { unlockVault } from './lib/secureVault';
 
-/** Bottom nav — mockup: Home | DocBox count | Grid | ScanQr */
-export function BottomNav({ onPlus, gridMode, onToggleGrid }: { onPlus?: () => void; gridMode?: 'grid' | 'single'; onToggleGrid?: () => void }) {
+/** Bottom: Home | DocBox count | Grid | ScanQr — mockup exact labels */
+export function BottomNav({
+  onPlus,
+  gridMode,
+  onToggleGrid,
+}: {
+  onPlus?: () => void;
+  gridMode?: 'grid' | 'single';
+  onToggleGrid?: () => void;
+}) {
   const navigate = useNavigate();
   const path = useLocation().pathname;
   const { getChildren } = useDogKeyStore();
   const boxCount = getChildren(null).length;
+
   return (
-    <nav className="docbox-dock" aria-label="Primary">
-      <button type="button" className={`docbox-dock-item ${path.startsWith('/home') ? 'active' : ''}`} onClick={() => navigate('/home')}>
-        <Icon.Home /><span>Home</span>
+    <nav className="docbox-dock" aria-label="Main">
+      <button
+        type="button"
+        className={path.startsWith('/home') || path === '/' ? 'active' : ''}
+        onClick={() => navigate('/home')}
+      >
+        <span className="dock-ico">⌂</span>
+        <span>Home</span>
       </button>
-      <button type="button" className={`docbox-dock-item ${path.startsWith('/shared') ? 'active' : ''}`} onClick={() => navigate('/shared')}>
-        <span className="docbox-dock-count">{boxCount}</span>
+      <button type="button" className={path.startsWith('/shared') ? 'active' : ''} onClick={() => navigate('/shared')}>
+        <span className="dock-count">{boxCount}</span>
         <span>DocBox</span>
       </button>
-      <button type="button" className={`docbox-dock-item ${gridMode === 'grid' ? 'active' : ''}`} onClick={() => onToggleGrid?.()}>
-        <Icon.Shared /><span>Grid</span>
+      <button type="button" className={gridMode === 'grid' ? 'active' : ''} onClick={() => onToggleGrid?.()}>
+        <span className="dock-ico">▦</span>
+        <span>Grid</span>
       </button>
-      <button type="button" className={`docbox-dock-item ${path.startsWith('/receive') ? 'active' : ''}`} onClick={() => navigate('/receive')}>
-        <Icon.Card /><span>ScanQr</span>
+      <button type="button" className={path.startsWith('/receive') ? 'active' : ''} onClick={() => navigate('/receive')}>
+        <span className="dock-ico">▣</span>
+        <span>ScanQr</span>
       </button>
     </nav>
   );
@@ -63,13 +79,13 @@ export function SplashScreen() {
       if (!hasOnboarded) navigate('/welcome');
       else if (!isUnlocked) navigate('/unlock');
       else navigate('/home');
-    }, 1200);
+    }, 900);
     return () => clearTimeout(t);
   }, [hasOnboarded, isUnlocked, navigate]);
   return (
-    <div className="docbox-app screen-center fade-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div className="docbox-brand rise-in">Dogkey</div>
-      <p className="subtext rise-in" style={{ marginTop: 12 }}>Documents on this device</p>
+    <div className="docbox-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="docbox-logo">Dogkey</div>
+      <p style={{ marginTop: 12, color: 'var(--db-muted)' }}>Documents on this device</p>
     </div>
   );
 }
@@ -77,20 +93,14 @@ export function SplashScreen() {
 export function WelcomeScreen() {
   const navigate = useNavigate();
   return (
-    <div className="docbox-app screen fade-in" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', paddingBottom: 40 }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', paddingTop: 24 }}>
-        <div className="docbox-brand rise-in" style={{ marginBottom: 20 }}>Dogkey</div>
-        <h1 className="heading rise-in" style={{ fontSize: 24, marginBottom: 12, lineHeight: 1.3 }}>
-          Keep files here.<br />Share only from Cart.
-        </h1>
-        <p className="subtext rise-in" style={{ maxWidth: 300, marginBottom: 24 }}>
-          DocBox cards, QR card, scan — no server required for core.
-        </p>
+    <div className="docbox-root" style={{ display: 'flex', flexDirection: 'column', padding: 24 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div className="docbox-logo" style={{ marginBottom: 16 }}>Dogkey</div>
+        <h1 style={{ fontSize: 22, marginBottom: 12 }}>Keep files here.<br />Share only from Cart.</h1>
+        <p style={{ color: 'var(--db-muted)', maxWidth: 280 }}>DocBox · QR card · Scan — no hosting needed for core.</p>
       </div>
-      <div style={{ maxWidth: 340, margin: '0 auto', width: '100%', padding: '0 8px' }}>
-        <button className="btn btn-primary btn-block" onClick={() => navigate('/create-pin')}>Get Started</button>
-        <button className="btn btn-secondary btn-block" style={{ marginTop: 10 }} onClick={() => navigate('/home')}>Skip — open Home</button>
-      </div>
+      <button className="btn btn-primary btn-block" onClick={() => navigate('/create-pin')}>Get Started</button>
+      <button className="btn btn-secondary btn-block" style={{ marginTop: 10 }} onClick={() => navigate('/home')}>Open Home</button>
     </div>
   );
 }
@@ -111,15 +121,13 @@ export function CreatePinScreen() {
     }
   };
   return (
-    <div className="docbox-app screen fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48, minHeight: '100dvh' }}>
-      <div className="docbox-brand" style={{ marginBottom: 8 }}>Dogkey</div>
-      <h1 className="heading" style={{ fontSize: 22, marginTop: 12 }}>Set PIN (optional later)</h1>
-      <p className="subtext" style={{ marginBottom: 16, textAlign: 'center' }}>
-        {step === 'enter' ? '4-digit PIN for this device' : 'Confirm PIN'}
-      </p>
-      {error && <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 12 }}>{error}</p>}
+    <div className="docbox-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48 }}>
+      <div className="docbox-logo">Dogkey</div>
+      <h1 style={{ fontSize: 20, marginTop: 16 }}>Set PIN</h1>
+      <p style={{ color: 'var(--db-muted)', marginBottom: 12 }}>{step === 'enter' ? '4-digit PIN' : 'Confirm PIN'}</p>
+      {error && <p style={{ color: '#f66' }}>{error}</p>}
       {step === 'enter' && (
-        <input className="input" style={{ marginBottom: 16, maxWidth: 280 }} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input" style={{ marginBottom: 12, maxWidth: 280 }} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
       )}
       <PinPad value={step === 'enter' ? pin : confirm} onChange={step === 'enter' ? setPin : setConfirm} maxLength={4} onComplete={(p) => { void handleComplete(p); }} />
       <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={() => navigate('/home')}>Skip</button>
@@ -136,18 +144,12 @@ export function UnlockScreen() {
     if (await verifyLoginPin(p)) { await unlockVault(true); setUnlocked(true); navigate('/home'); }
     else { setError('Incorrect PIN'); setPin(''); }
   };
-  const initial = (user?.displayName || 'U').charAt(0).toUpperCase();
   return (
-    <div className="docbox-app screen fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48, minHeight: '100dvh' }}>
-      {user?.profilePhoto ? (
-        <img src={user.profilePhoto} alt="" className="avatar-lg" style={{ marginBottom: 12 }} />
-      ) : (
-        <div className="avatar avatar-lg" style={{ marginBottom: 12 }}>{initial}</div>
-      )}
-      <div className="docbox-brand" style={{ marginBottom: 4 }}>Dogkey</div>
-      <h1 className="heading" style={{ fontSize: 22, marginTop: 8 }}>Welcome back</h1>
-      <p className="subtext" style={{ marginBottom: 8 }}>Enter PIN</p>
-      {error && <p style={{ color: 'var(--danger)', fontSize: 14, marginBottom: 12 }}>{error}</p>}
+    <div className="docbox-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48 }}>
+      {user?.profilePhoto ? <img src={user.profilePhoto} alt="" className="docbox-avatar" style={{ width: 72, height: 72, marginBottom: 12 }} /> : null}
+      <div className="docbox-logo">Dogkey</div>
+      <p style={{ color: 'var(--db-muted)', margin: '8px 0 12px' }}>Enter PIN</p>
+      {error && <p style={{ color: '#f66' }}>{error}</p>}
       <PinPad value={pin} onChange={setPin} maxLength={4} onComplete={(p) => { void handle(p); }} />
     </div>
   );
@@ -155,18 +157,13 @@ export function UnlockScreen() {
 
 export function ConnectDriveScreen() {
   const navigate = useNavigate();
-  const { connectGoogle } = useDogKeyStore();
-  const [msg, setMsg] = useState('');
   return (
-    <div className="docbox-app screen fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48, minHeight: '100dvh' }}>
-      <div className="docbox-brand" style={{ marginBottom: 16 }}>Dogkey</div>
-      <h1 className="heading" style={{ fontSize: 22 }}>Google Drive</h1>
-      <p className="subtext" style={{ maxWidth: 300, textAlign: 'center', marginBottom: 16 }}>
-        Optional. Your Drive, your backup.
-      </p>
-      {msg && <p className="muted" style={{ marginBottom: 12 }}>{msg}</p>}
-      <button className="btn btn-primary btn-block" style={{ maxWidth: 320 }} onClick={() => { connectGoogle(); setMsg('Continuing…'); setTimeout(() => navigate('/home'), 800); }}>Connect Google Drive</button>
-      <button className="btn btn-secondary btn-block" style={{ maxWidth: 320, marginTop: 12 }} onClick={() => navigate('/home')}>Skip</button>
+    <div className="docbox-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48, paddingLeft: 24, paddingRight: 24 }}>
+      <div className="docbox-logo">Dogkey</div>
+      <h1 style={{ fontSize: 20, marginTop: 16 }}>Google Drive</h1>
+      <p style={{ color: 'var(--db-muted)', textAlign: 'center', marginBottom: 20 }}>Optional backup to your Drive.</p>
+      <button className="btn btn-primary btn-block" style={{ maxWidth: 320 }} onClick={() => navigate('/home')}>Continue</button>
+      <button className="btn btn-secondary btn-block" style={{ maxWidth: 320, marginTop: 10 }} onClick={() => navigate('/home')}>Skip</button>
     </div>
   );
 }
